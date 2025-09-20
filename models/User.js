@@ -1,20 +1,26 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
-const validator = require('validator');
 
 const userSchema = new mongoose.Schema({
     name: {
         type: String,
         required: [true, 'Name is required'],
         trim: true,
-        maxlength: [50, 'Name cannot exceed 50 characters']
+        minlength: [2, 'Name must be at least 2 characters long'],
+        maxlength: [100, 'Name cannot exceed 100 characters']
     },
     email: {
         type: String,
         required: [true, 'Email is required'],
         unique: true,
         lowercase: true,
-        validate: [validator.isEmail, 'Please provide a valid email']
+        trim: true,
+        validate: {
+            validator: function(email) {
+                return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+            },
+            message: 'Please enter a valid email address'
+        }
     },
     password: {
         type: String,
@@ -24,85 +30,103 @@ const userSchema = new mongoose.Schema({
     },
     budget: {
         type: Number,
-        required: [true, 'Budget is required'],
+        default: 75,
         min: [0, 'Budget cannot be negative'],
-        default: 500
-    },
-    preferences: {
-        // Dietary preferences
-        dietary: {
-            type: [String],
-            enum: ['vegetarian', 'vegan', 'non-vegetarian', 'jain', 'gluten-free', 'keto', 'diabetic'],
-            default: ['vegetarian']
-        },
-        // Preferred cuisines
-        cuisines: {
-            type: [String],
-            enum: [
-                'North Indian', 'South Indian', 'Chinese', 'Italian', 'Continental',
-                'Gujarati', 'Punjabi', 'Bengali', 'Rajasthani', 'Maharashtrian',
-                'Tamil', 'Kerala', 'Andhra Pradesh', 'Fast Food', 'Beverages',
-                'Sweets', 'Bakery'
-            ],
-            default: ['North Indian', 'South Indian']
-        },
-        // Allergies
-        allergies: {
-            type: [String],
-            default: []
-        },
-        // Health goals
-        healthGoals: {
-            type: [String],
-            enum: ['weight-loss', 'weight-gain', 'muscle-building', 'general-health', 'diabetes-management'],
-            default: ['general-health']
-        },
-        // Nutritional targets
-        maxCalories: {
-            type: Number,
-            default: 2000,
-            min: 800,
-            max: 4000
-        },
-        minProtein: {
-            type: Number,
-            default: 50,
-            min: 20,
-            max: 200
-        },
-        maxCarbs: {
-            type: Number,
-            default: 250
-        },
-        maxFats: {
-            type: Number,
-            default: 80
-        }
+        max: [10000, 'Budget cannot exceed $10,000']
     },
     location: {
-        city: {
-            type: String,
-            required: [true, 'City is required'],
+        city: { 
+            type: String, 
+            default: 'Unknown',
             trim: true
         },
-        state: {
-            type: String,
+        state: { 
+            type: String, 
+            default: 'Unknown',
             trim: true
         },
-        country: {
-            type: String,
-            default: 'India'
+        country: { 
+            type: String, 
+            default: 'India',
+            trim: true
+        }
+    },
+    preferences: {
+        cuisines: {
+            type: [String],
+            default: [],
+            enum: [
+                // Updated enum values to match your frontend options
+                'Mediterranean',
+                'Asian', 
+                'Mexican',
+                'Italian',
+                'Indian',         // ✅ Added this
+                'Plant-Based',
+                'Keto',
+                'Paleo', 
+                'American',
+                'Middle Eastern'
+            ],
+            validate: {
+                validator: function(cuisines) {
+                    return Array.isArray(cuisines);
+                },
+                message: 'Cuisines must be an array'
+            }
         },
-        coordinates: {
-            latitude: {
-                type: Number,
-                min: -90,
-                max: 90
-            },
-            longitude: {
-                type: Number,
-                min: -180,
-                max: 180
+        goals: {
+            type: [String],
+            default: [],
+            enum: [
+                // Updated enum values to match your frontend options
+                'Lose Weight',
+                'Build Muscle', 
+                'Eat More Plants',
+                'Save Time',
+                'Try New Foods',
+                'Eat Healthier',
+                'Family Meals',
+                'Meal Prep'
+            ],
+            validate: {
+                validator: function(goals) {
+                    return Array.isArray(goals);
+                },
+                message: 'Goals must be an array'
+            }
+        },
+        allergies: {
+            type: [String],
+            default: [],
+            enum: [
+                // Updated enum values to match your frontend options
+                'Nuts',
+                'Dairy',
+                'Gluten', 
+                'Shellfish',
+                'Eggs',
+                'Soy',
+                'Fish',
+                'Sesame',
+                'None'
+            ],
+            validate: {
+                validator: function(allergies) {
+                    return Array.isArray(allergies);
+                },
+                message: 'Allergies must be an array'
+            }
+        },
+        dietaryRestrictions: {
+            type: [String],
+            default: [],
+            // No enum restrictions for dietary restrictions - more flexible
+            validate: {
+                validator: function(restrictions) {
+                    return Array.isArray(restrictions);
+                },
+                message: 'Dietary restrictions must be an array'
             }
         }
     },
@@ -111,24 +135,29 @@ const userSchema = new mongoose.Schema({
         default: true
     },
     lastLogin: {
-        type: Date
+        type: Date,
+        default: Date.now
     }
 }, {
-    timestamps: true // Automatically adds createdAt and updatedAt
+    timestamps: true,
+    toJSON: {
+        transform: function(doc, ret) {
+            delete ret.password;
+            delete ret.__v;
+            return ret;
+        }
+    }
 });
 
-// Create indexes for better performance
+// Index for email lookups
 userSchema.index({ email: 1 });
-userSchema.index({ 'location.city': 1 });
-userSchema.index({ 'preferences.dietary': 1 });
-userSchema.index({ createdAt: -1 });
 
 // Pre-save middleware to hash password
 userSchema.pre('save', async function(next) {
-    // Only hash the password if it has been modified (or is new)
-    if (!this.isModified('password')) return next();
-
     try {
+        // Only hash the password if it has been modified (or is new)
+        if (!this.isModified('password')) return next();
+        
         // Hash password with cost of 12
         const salt = await bcrypt.genSalt(12);
         this.password = await bcrypt.hash(this.password, salt);
@@ -138,26 +167,35 @@ userSchema.pre('save', async function(next) {
     }
 });
 
-// Instance method to check password
+// Compare password method
 userSchema.methods.comparePassword = async function(candidatePassword) {
     try {
+        if (!this.password) {
+            throw new Error('Password not found for user');
+        }
         return await bcrypt.compare(candidatePassword, this.password);
     } catch (error) {
-        throw error;
+        console.error('Password comparison error:', error);
+        throw new Error('Password comparison failed');
     }
 };
 
-// Instance method to get user data without sensitive info
-userSchema.methods.toJSON = function() {
-    const user = this.toObject();
-    delete user.password;
-    delete user.__v;
-    return user;
+// Find user by email static method
+userSchema.statics.findByEmail = function(email) {
+    return this.findOne({ email: email.toLowerCase().trim() });
 };
 
-// Static method to find user by email
-userSchema.statics.findByEmail = function(email) {
-    return this.findOne({ email: email.toLowerCase() });
-};
+// Pre-validate middleware
+userSchema.pre('validate', function(next) {
+    console.log('🔍 Validating user data:', {
+        name: this.name,
+        email: this.email,
+        hasPassword: !!this.password,
+        budget: this.budget,
+        location: this.location,
+        preferences: this.preferences
+    });
+    next();
+});
 
 module.exports = mongoose.model('User', userSchema);
