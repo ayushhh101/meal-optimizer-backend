@@ -1,100 +1,113 @@
+// backend-service/server.js
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const helmet = require('helmet');
-const morgan = require('morgan');
-const cookieParser = require('cookie-parser');
+const compression = require('compression');
+const rateLimit = require('express-rate-limit');
 require('dotenv').config();
+
+const authRoutes = require('./routes/auth');
+const userRoutes = require('./routes/users');
+const mealPlanRoutes = require('./routes/mealPlans');
 
 const app = express();
 
-// Middleware
+// Security middleware
 app.use(helmet());
+app.use(compression());
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: 'Too many requests from this IP, please try again later.'
+});
+app.use('/api/', limiter);
+
+// CORS
 app.use(cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-    credentials: true
+  origin: [
+    process.env.FRONTEND_URL || 'http://localhost:3000',
+    process.env.AI_AGENT_SERVICE_URL || 'http://localhost:8000'
+  ],
+  credentials: true
 }));
-app.use(morgan('combined'));
+
+// Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-app.use(cookieParser());
+app.use(express.urlencoded({ extended: true }));
 
-// MongoDB Connection
-const connectDB = async () => {
-    try {
-        const conn = await mongoose.connect(process.env.MONGODB_URI, {
-            useNewUrlParser: true,
-            useUnifiedTopology: true,
-        });
-        console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
-    } catch (error) {
-        console.error('❌ MongoDB Connection Error:', error.message);
-        process.exit(1);
-    }
-};
-
-connectDB();
-
-// Routes
-app.use('/api/auth', require('./routes/auth'));
-app.use('/api/users', require('./routes/users'));
-
-// Health check route
-app.get('/api/health', (req, res) => {
-    res.json({ 
-        status: 'OK', 
-        message: 'Meal Optimizer Backend is running!',
-        timestamp: new Date().toISOString(),
-        environment: process.env.NODE_ENV || 'development'
-    });
+// Request logging
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+  next();
 });
 
-// Welcome route
+// Connect to MongoDB
+mongoose.connect(process.env.MONGODB_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+})
+.then(() => console.log('✅ Connected to MongoDB'))
+.catch(err => console.error('❌ MongoDB connection error:', err));
+
+// Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/meal-plans', mealPlanRoutes);
+
+// Health check
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'healthy',
+    service: 'meal-planner-backend',
+    version: '2.0.0',
+    timestamp: new Date().toISOString(),
+    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+  });
+});
+
+// Root endpoint
 app.get('/', (req, res) => {
-    res.json({
-        message: 'Welcome to Meal Optimizer API',
-        version: '1.0.0',
-        endpoints: {
-            health: '/api/health',
-            auth: {
-                register: 'POST /api/auth/register',
-                login: 'POST /api/auth/login',
-                me: 'GET /api/auth/me'
-            },
-            users: {
-                profile: 'GET /api/users/profile',
-                updateProfile: 'PUT /api/users/profile',
-                updatePreferences: 'PUT /api/users/preferences',
-                updateBudget: 'PUT /api/users/budget'
-            }
-        }
-    });
+  res.json({
+    service: 'Meal Planner Backend API',
+    version: '2.0.0',
+    endpoints: {
+      auth: '/api/auth',
+      users: '/api/users',
+      mealPlans: '/api/meal-plans',
+      health: '/health'
+    }
+  });
 });
 
 // Error handling middleware
-app.use((err, req, res, next) => {
-    console.error('Error:', err.stack);
-    res.status(err.status || 500).json({ 
-        success: false, 
-        message: err.message || 'Something went wrong!', 
-        error: process.env.NODE_ENV === 'development' ? err.stack : 'Internal Server Error'
-    });
+app.use((error, req, res, next) => {
+  console.error('Unhandled error:', error);
+  res.status(500).json({
+    success: false,
+    error: 'Internal server error',
+    message: process.env.NODE_ENV === 'development' ? error.message : 'Something went wrong'
+  });
 });
 
 // 404 handler
 app.use('*', (req, res) => {
-    res.status(404).json({ 
-        success: false, 
-        message: `Route ${req.originalUrl} not found` 
-    });
+  res.status(404).json({
+    success: false,
+    error: 'Endpoint not found',
+    message: `${req.method} ${req.originalUrl} is not a valid endpoint`
+  });
 });
 
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
-    console.log(`📍 API Base URL: http://localhost:${PORT}`);
-    console.log(`🏥 Health Check: http://localhost:${PORT}/api/health`);
+  console.log(`🚀 Backend server running on port ${PORT}`);
+  console.log(`📊 Health check: http://localhost:${PORT}/health`);
+  console.log(`🔐 Auth endpoints: http://localhost:${PORT}/api/auth`);
+  console.log(`🍽️  Meal plan endpoints: http://localhost:${PORT}/api/meal-plans`);
 });
 
 module.exports = app;
