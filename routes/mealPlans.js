@@ -7,13 +7,22 @@ const {
   getMealPlans,
   getMealPlanById,
   updateMealPlanFeedback,
-  searchRecipes
+  searchRecipes,
+  generateMealPlanFromAgent,
 } = require('../controllers/mealPlanController');
 
 const router = express.Router();
 
-// Generate meal plan
-router.post('/generate', 
+// Route to get a meal plan directly from the Python agent
+router.post(
+  '/generate-from-agent',
+  auth,
+  generateMealPlanFromAgent
+);
+
+// Generate meal plan and save to DB
+router.post(
+  '/generate', 
   auth,
   [
     body('date').optional().isISO8601().toDate(),
@@ -24,7 +33,8 @@ router.post('/generate',
 );
 
 // Get user's meal plans
-router.get('/', 
+router.get(
+  '/', 
   auth,
   [
     query('date').optional().isISO8601(),
@@ -35,14 +45,16 @@ router.get('/',
 );
 
 // Get specific meal plan
-router.get('/:planId', 
+router.get(
+  '/:planId', 
   auth,
   [param('planId').notEmpty()],
   getMealPlanById
 );
 
 // Update meal plan feedback
-router.put('/:planId/feedback', 
+router.put(
+  '/:planId/feedback', 
   auth,
   [
     param('planId').notEmpty(),
@@ -54,7 +66,8 @@ router.put('/:planId/feedback',
 );
 
 // Search recipes
-router.post('/recipes/search', 
+router.post(
+  '/recipes/search', 
   auth,
   [
     body('dietary').optional().isArray(),
@@ -67,3 +80,4 @@ router.post('/recipes/search',
 );
 
 module.exports = router;
+

@@ -25,12 +25,22 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
-// CORS
+// CORS Configuration
+const allowedOrigins = [
+  process.env.FRONTEND_URL, // For your deployed site
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:3000'
+].filter(Boolean);
+
 app.use(cors({
-  origin: [
-    process.env.FRONTEND_URL || 'http://localhost:3000',
-    process.env.AI_AGENT_SERVICE_URL || 'http://localhost:8000'
-  ],
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true
 }));
 
@@ -62,9 +72,7 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'healthy',
     service: 'meal-planner-backend',
-    version: '2.0.0',
-    timestamp: new Date().toISOString(),
-    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+    timestamp: new Date().toISOString()
   });
 });
 
@@ -72,13 +80,7 @@ app.get('/health', (req, res) => {
 app.get('/', (req, res) => {
   res.json({
     service: 'Meal Planner Backend API',
-    version: '2.0.0',
-    endpoints: {
-      auth: '/api/auth',
-      users: '/api/users',
-      mealPlans: '/api/meal-plans',
-      health: '/health'
-    }
+    version: '2.0.0'
   });
 });
 
@@ -105,9 +107,6 @@ const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
   console.log(`🚀 Backend server running on port ${PORT}`);
-  console.log(`📊 Health check: http://localhost:${PORT}/health`);
-  console.log(`🔐 Auth endpoints: http://localhost:${PORT}/api/auth`);
-  console.log(`🍽️  Meal plan endpoints: http://localhost:${PORT}/api/meal-plans`);
 });
 
 module.exports = app;
