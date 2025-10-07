@@ -10,6 +10,7 @@ const recipeSchema = new mongoose.Schema({
   ingredients: [{ type: String }],
   youtube_link: { type: String },
   image_url: { type: String },
+  isCompleted: { type: Boolean, default: false },
   cookTime: { type: String }
 }, { _id: false });
 

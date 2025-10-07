@@ -559,6 +559,61 @@ const getTodaysGroceryList = async (req, res) => {
       });
     }
 
+    // In controllers/mealPlanController.js
+
+// ... other functions ...
+
+const toggleMealCompletion = async (req, res) => {
+  try {
+    const { mealType } = req.params; // 'breakfast', 'lunch', or 'dinner'
+    const { isCompleted } = req.body; // true or false
+    const userId = req.user.userId;
+
+    if (!['breakfast', 'lunch', 'dinner'].includes(mealType)) {
+      return res.status(400).json({ success: false, message: 'Invalid meal type.' });
+    }
+
+    const weekDetails = getWeekDetails();
+    const today = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+
+    // Find the current weekly plan
+    const weeklyPlan = await WeeklyMealPlan.findOne({
+      userId,
+      year: weekDetails.year,
+      month: weekDetails.month,
+      weekOfMonth: weekDetails.weekOfMonth,
+    });
+
+    if (!weeklyPlan) {
+      return res.status(404).json({ success: false, message: 'Weekly meal plan not found.' });
+    }
+
+    // Find today's plan within the week
+    const dayPlan = weeklyPlan.days.find(day => day.day === today);
+    if (!dayPlan || !dayPlan[mealType]) {
+        return res.status(404).json({ success: false, message: `Meal for ${mealType} not found for today.` });
+    }
+
+    // Update the status and save
+    dayPlan[mealType].isCompleted = isCompleted;
+    await weeklyPlan.save();
+
+    res.json({
+      success: true,
+      message: `${mealType} updated successfully.`,
+      data: dayPlan[mealType]
+    });
+
+  } catch (error) {
+    console.error(`❌ Error toggling meal completion for ${req.params.mealType}:`, error);
+    res.status(500).json({ success: false, message: 'Server error while updating meal.' });
+  }
+};
+
+
+
+
+
     // Find today's meals
     const todaysMeals = weeklyPlan.days.find(day => day.day === today);
 
@@ -643,6 +698,56 @@ const getTodaysGroceryList = async (req, res) => {
       message: error.message
     });
   }
+
+
+  
+
+
+};
+
+
+const toggleMealCompletion = async (req, res) => {
+  try {
+    const { mealType } = req.params; // 'breakfast', 'lunch', or 'dinner'
+    const { isCompleted } = req.body; // true or false
+    const userId = req.user.userId;
+
+    if (!['breakfast', 'lunch', 'dinner'].includes(mealType)) {
+      return res.status(400).json({ success: false, message: 'Invalid meal type.' });
+    }
+
+    const weekDetails = getWeekDetails();
+    const today = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+
+    const weeklyPlan = await WeeklyMealPlan.findOne({
+      userId,
+      year: weekDetails.year,
+      month: weekDetails.month,
+      weekOfMonth: weekDetails.weekOfMonth,
+    });
+
+    if (!weeklyPlan) {
+      return res.status(404).json({ success: false, message: 'Weekly meal plan not found.' });
+    }
+
+    const dayPlan = weeklyPlan.days.find(day => day.day === today);
+    if (!dayPlan || !dayPlan[mealType]) {
+        return res.status(404).json({ success: false, message: `Meal for ${mealType} not found for today.` });
+    }
+
+    dayPlan[mealType].isCompleted = isCompleted;
+    await weeklyPlan.save();
+
+    res.json({
+      success: true,
+      message: `${mealType} updated successfully.`,
+      data: dayPlan[mealType]
+    });
+
+  } catch (error) {
+    console.error(`❌ Error toggling meal completion for ${req.params.mealType}:`, error);
+    res.status(500).json({ success: false, message: 'Server error while updating meal.' });
+  }
 };
 
 
@@ -657,5 +762,6 @@ module.exports = {
   getAllUserMealPlans,
   deleteMealPlan,
   getTodaysMeals,
-  getTodaysGroceryList
+  getTodaysGroceryList,
+  toggleMealCompletion
 };

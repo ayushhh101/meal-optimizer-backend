@@ -2,6 +2,7 @@ const express = require('express');
 const User = require('../models/User');
 const auth = require('../middleware/auth');
 const router = express.Router();
+ 
 
 // @route   GET /api/users/profile
 // @desc    Get user profile
@@ -469,5 +470,6 @@ router.get('/stats', auth, async (req, res) => {
         });
     }
 });
+
 
 module.exports = router;

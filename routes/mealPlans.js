@@ -13,7 +13,8 @@ const {
   getAllUserMealPlans,
   deleteMealPlan,
   getTodaysMeals,
-  getTodaysGroceryList
+  getTodaysGroceryList,
+  toggleMealCompletion
 } = require('../controllers/mealPlanController');
 
 const router = express.Router();
@@ -46,6 +47,13 @@ router.get(
   '/today',
   auth,
   getTodaysMeals
+);
+
+router.patch(
+  '/today/:mealType/complete',
+  auth,
+  // Add toggleMealCompletion to the list of imported controllers
+  toggleMealCompletion 
 );
 
 // Route to get all user's weekly meal plans (specific route)
