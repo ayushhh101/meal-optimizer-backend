@@ -228,11 +228,11 @@ router.post('/login', async (req, res) => {
             maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
         });
         
-        // Also return Bearer token in response for API clients
+        // Return plain token in response for API clients (frontend will add Bearer prefix)
         res.json({
             success: true,
             message: 'Login successful',
-            token: `Bearer ${token}`,
+            token: token,
             user: userResponse
         });
     } catch (error) {

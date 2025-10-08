@@ -43,16 +43,24 @@ router.get(
   getCurrentWeekMealPlan
 );
 
+// Route to get today's meals (specific route)
 router.get(
   '/today',
   auth,
   getTodaysMeals
 );
 
+// Route to get today's grocery list (specific route - must come before generic /:planId)
+router.get(
+  '/today/grocery',
+  auth,
+  getTodaysGroceryList
+);
+
+// Route to toggle meal completion (specific route)
 router.patch(
   '/today/:mealType/complete',
   auth,
-  // Add toggleMealCompletion to the list of imported controllers
   toggleMealCompletion 
 );
 
@@ -135,12 +143,6 @@ router.get(
   auth,
   [param('planId').notEmpty().isMongoId()],
   getMealPlanById
-);
-
-router.get(
-  '/today/grocery',
-  auth,
-  getTodaysGroceryList
 );
 
 module.exports = router;

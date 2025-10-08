@@ -449,11 +449,9 @@ const getTodaysMeals = async (req, res) => {
     const userId = req.user.userId;
     const weekDetails = getWeekDetails();
     
-    // Get current day name (Monday, Tuesday, etc.)
     const today = new Date().toLocaleDateString('en-US', { weekday: 'long' });
     console.log(`📅 Fetching meals for ${today}`);
 
-    // Find current week's meal plan
     const weeklyPlan = await WeeklyMealPlan.findOne({
       userId,
       year: weekDetails.year,
@@ -470,7 +468,6 @@ const getTodaysMeals = async (req, res) => {
       });
     }
 
-    // Find today's meals from the days array
     const todaysMeals = weeklyPlan.days.find(day => day.day === today);
 
     if (!todaysMeals) {
@@ -481,46 +478,84 @@ const getTodaysMeals = async (req, res) => {
       });
     }
 
-    // Calculate today's nutrition totals
-    const nutritionStats = {
-      calories: (todaysMeals.breakfast?.calories || 0) + 
-                (todaysMeals.lunch?.calories || 0) + 
-                (todaysMeals.dinner?.calories || 0),
-      protein: (todaysMeals.breakfast?.protein || 0) + 
-               (todaysMeals.lunch?.protein || 0) + 
-               (todaysMeals.dinner?.protein || 0),
-      carbs: (todaysMeals.breakfast?.carbs || 0) + 
-             (todaysMeals.lunch?.carbs || 0) + 
-             (todaysMeals.dinner?.carbs || 0),
-      fat: (todaysMeals.breakfast?.fat || 0) + 
-           (todaysMeals.lunch?.fat || 0) + 
-           (todaysMeals.dinner?.fat || 0)
+    const defaultImage = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400';
+
+    // Helper function to format meal data
+    const formatMealData = (meal, mealType, defaultName) => {
+      if (!meal) {
+        return {
+          id: mealType,
+          title: defaultName,
+          type: mealType,
+          category: mealType.charAt(0).toUpperCase() + mealType.slice(1),
+          calories: 0,
+          protein: 0,
+          carbs: 0,
+          fat: 0,
+          ingredients: [],
+          recipe: '',
+          image: defaultImage,
+          cookTime: '30 mins',
+          servings: '2',
+          isCompleted: false,
+          isAiGenerated: true
+        };
+      }
+
+      return {
+        id: mealType,
+        title: meal.name || defaultName,
+        type: mealType,
+        category: mealType.charAt(0).toUpperCase() + mealType.slice(1),
+        calories: meal.calories || 0,
+        protein: meal.protein || 0,
+        carbs: meal.carbs || 0,
+        fat: meal.fat || 0,
+        ingredients: meal.ingredients || [],
+        recipe: meal.recipe || '',
+        image: meal.image_url || meal.image || defaultImage, // Map both image_url and image
+        cookTime: meal.cookTime || '30 mins',
+        servings: meal.servings || '2',
+        isCompleted: meal.isCompleted || false,
+        isAiGenerated: true,
+        youtubeLink: meal.youtube_link || ''
+      };
     };
 
-    console.log(`✅ Found meals for ${today}:`, {
-      breakfast: todaysMeals.breakfast?.name,
-      lunch: todaysMeals.lunch?.name,
-      dinner: todaysMeals.dinner?.name,
+    // Format meals with proper structure
+    const mealsArray = [
+      formatMealData(todaysMeals.breakfast, 'breakfast', 'No Breakfast Planned'),
+      formatMealData(todaysMeals.lunch, 'lunch', 'No Lunch Planned'),
+      formatMealData(todaysMeals.dinner, 'dinner', 'No Dinner Planned')
+    ];
+
+    const nutritionStats = {
+      calories: mealsArray.reduce((sum, meal) => sum + (meal.calories || 0), 0),
+      protein: mealsArray.reduce((sum, meal) => sum + (meal.protein || 0), 0),
+      carbs: mealsArray.reduce((sum, meal) => sum + (meal.carbs || 0), 0),
+      fat: mealsArray.reduce((sum, meal) => sum + (meal.fat || 0), 0)
+    };
+
+    console.log(`✅ Formatted meals for ${today}:`, {
+      breakfast: mealsArray[0].title,
+      lunch: mealsArray[1].title,
+      dinner: mealsArray[2].title,
       totalCalories: nutritionStats.calories
     });
 
     res.json({
       success: true,
-      data: {
+      mealPlan: {
         day: today,
-        meals: {
-          breakfast: todaysMeals.breakfast,
-          lunch: todaysMeals.lunch,
-          dinner: todaysMeals.dinner
-        },
-        nutritionStats,
-        weekInfo: {
-          weekOfMonth: weeklyPlan.weekOfMonth,
-          weekNumber: weeklyPlan.weekNumber,
-          startDate: weeklyPlan.startDate,
-          endDate: weeklyPlan.endDate,
-          optionName: weeklyPlan.optionName
-        }
+        meals: mealsArray,
+        nutritionStats
+      },
+      weekInfo: {
+        weekOfMonth: weeklyPlan.weekOfMonth,
+        weekNumber: weeklyPlan.weekNumber,
+        startDate: weeklyPlan.startDate,
+        endDate: weeklyPlan.endDate,
+        optionName: weeklyPlan.optionName
       }
     });
 
