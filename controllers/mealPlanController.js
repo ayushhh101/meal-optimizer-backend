@@ -785,6 +785,54 @@ const toggleMealCompletion = async (req, res) => {
   }
 };
 
+const generateMealPlanInsight = async (req, res) => {
+  try {
+    const fastApiUrl = 'http://127.0.0.1:8000/generate-insight'; 
+    const userId = req.user.userId;
+
+    const user = await User.findById(userId).select('name preferences');
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+   const weeklyPlans = await WeeklyMealPlan.find({ 
+      userId: userId,
+      endDate: { $gte: sevenDaysAgo } 
+    });
+    
+    const completedMeals = [];
+    weeklyPlans.forEach(plan => {
+      plan.days.forEach(day => {
+        ['breakfast', 'lunch', 'dinner'].forEach(mealType => {
+          if (day[mealType] && day[mealType].isCompleted) {
+            completedMeals.push(day[mealType]);
+          }
+        });
+      });
+    });
+
+    if (completedMeals.length < 3) {
+      return res.status(400).json({ success: false, message: 'Not enough data for an insight. Mark at least 3 meals as eaten!' });
+    }
+
+    const response = await axios.post(fastApiUrl, {
+      userProfile: user.toObject(),
+      completedMeals: completedMeals 
+    });
+
+    res.json(response.data);
+
+  } catch (error) {
+    console.error('❌ Error in generateMealPlanInsight:', error.message);
+    if (error.isAxiosError) {
+      return res.status(503).json({ success: false, message: 'The AI insight service is currently unavailable.' });
+    }
+    res.status(500).json({ success: false, message: 'Failed to generate insight' });
+  }
+};
 
 module.exports = {
   generateMealPlan,
@@ -798,5 +846,6 @@ module.exports = {
   deleteMealPlan,
   getTodaysMeals,
   getTodaysGroceryList,
-  toggleMealCompletion
+  toggleMealCompletion,
+  generateMealPlanInsight
 };

@@ -14,7 +14,8 @@ const {
   deleteMealPlan,
   getTodaysMeals,
   getTodaysGroceryList,
-  toggleMealCompletion
+  toggleMealCompletion,
+  generateMealPlanInsight
 } = require('../controllers/mealPlanController');
 
 const router = express.Router();
@@ -73,6 +74,12 @@ router.get(
     query('page').optional().isInt({ min: 1 })
   ],
   getAllUserMealPlans
+);
+
+router.post(
+  '/insights',
+  auth, 
+  generateMealPlanInsight
 );
 
 // Route to generate/get cached meal plan from AI agent
