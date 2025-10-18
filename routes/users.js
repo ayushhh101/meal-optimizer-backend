@@ -89,21 +89,31 @@ router.put('/profile', auth, async (req, res) => {
         }
         
         if (location) {
+            // Initialize location if it doesn't exist
+            if (!user.location) {
+                user.location = {};
+            }
+            
             // Handle both object and string formats
             if (typeof location === 'string') {
                 const locationParts = location.split(',').map(part => part.trim());
-                user.location = {
-                    city: locationParts[0] || user.location.city,
-                    state: locationParts[1] || user.location.state,
-                    country: locationParts[2] || user.location.country
-                };
+                user.location.city = locationParts[0] || user.location.city || '';
+                user.location.state = locationParts[1] || user.location.state || '';
+                user.location.country = locationParts[2] || user.location.country || 'India';
             } else {
+                // Merge with existing location data
                 user.location = { 
-                    ...user.location.toObject(), 
-                    ...location 
+                    city: location.city || user.location.city || '',
+                    state: location.state || user.location.state || '',
+                    country: location.country || user.location.country || 'India'
                 };
             }
             console.log('📍 Updated location to:', user.location);
+        }
+
+        // Mark the location as modified if it exists
+        if (user.location) {
+            user.markModified('location');
         }
 
         await user.save();
